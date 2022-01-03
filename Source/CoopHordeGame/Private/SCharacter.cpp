@@ -78,7 +78,7 @@ void ASCharacter::BeginPlay()
 
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		CurrentWeapon = GetWorld()->SpawnActor<ASRangedWeapon>(EquipppedWeapon, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		CurrentWeapon = GetWorld()->SpawnActor<ASRangedWeapon>(EquipppedWeapon->Weapon, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
 		if (CurrentWeapon)
 		{
 			CurrentWeapon->SetOwner(this);
