@@ -65,10 +65,10 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 
-	UFUNCTION(BlueprintGetter)
+	UFUNCTION(BlueprintCallable)
 	int32 GetBotsLeftToSpawn() const;
 
-	UFUNCTION(BlueprintGetter)
+	UFUNCTION(BlueprintCallable)
 		int32 GetWaveCount() const;
 
 	UPROPERTY(BlueprintAssignable, Category = "GameMode")
@@ -77,5 +77,6 @@ public:
 	UFUNCTION()
 	float GetFriendlyFirePercentage();
 
-
+	UFUNCTION(BlueprintCallable)
+	float GetTimeBetweenWaves() const;
 };

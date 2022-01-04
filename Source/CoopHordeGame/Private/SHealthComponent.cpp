@@ -4,15 +4,19 @@
 #include "SHealthComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "SGameMode.h"
+#include "TimerManager.h"
 // Sets default values for this component's properties
 USHealthComponent::USHealthComponent()
 {
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
-	
+	PrimaryComponentTick.SetTickFunctionEnable(true);
 	MaxHealth = 100;
 	Health = MaxHealth;
+	MaxShield = 0;
+	
+	Shield = MaxShield;
 	// ...
 
 	bIsDead = false;
@@ -28,13 +32,17 @@ void USHealthComponent::BeginPlay()
 	// We don't need to protect the fire add damage because we are limiting the health component to the server
 	if (GetOwnerRole() == ROLE_Authority)
 	{
+		Health = MaxHealth;
+		Shield = MaxShield;
 		AActor* MyOwner = GetOwner();
 		if (MyOwner)
 		{
 			MyOwner->OnTakeAnyDamage.AddDynamic(this, &USHealthComponent::handleTakeDamage);
 		}
+
+		ShieldSecondRegen = MaxShield / ShieldRegenDuration;
 	}
-	
+
 }
 
 void USHealthComponent::OnRep_Health(float OldHealth)
@@ -43,8 +51,21 @@ void USHealthComponent::OnRep_Health(float OldHealth)
 	OnHealthChanged.Broadcast(this, Health, Damage, nullptr, nullptr, nullptr);
 }
 
+void USHealthComponent::StartShieldRegen()
+{
+	bShieldRegen = true;
+	
+}
+
+void USHealthComponent::OnRep_Shield(float OldShield)
+{
+	float Damage = Shield - OldShield;
+	OnShieldChanged.Broadcast(this, Shield, Damage, nullptr, nullptr, nullptr);
+}
+
 void USHealthComponent::handleTakeDamage(AActor* DamagedActor, float Damage, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser)
 {
+	bShieldRegen = false;
 	if (DamageCauser != DamagedActor && IsFriendly(DamageCauser, DamagedActor))
 	{
 		ASGameMode* GM = Cast<ASGameMode>(GetWorld()->GetAuthGameMode());
@@ -54,26 +75,51 @@ void USHealthComponent::handleTakeDamage(AActor* DamagedActor, float Damage, con
 		}
 
 	}
-	if (Damage <= 0.0f||bIsDead)
+	if (Damage <= 0.0f || bIsDead)
 	{
-
 		return;
 	}
-	Health = FMath::Clamp(Health - Damage, 0.0f, MaxHealth);
-
-	UE_LOG(LogTemp, Log, TEXT("%s Damage Taken, new Health is %s"), *FString::SanitizeFloat(Damage), *FString::SanitizeFloat(Health));
-
-	OnHealthChanged.Broadcast(this, Health, Damage, DamageType, InstigatedBy, DamageCauser);
-	if (Health <= 0.0f && !bIsDead)
+	if (Shield > 0.0f)
 	{
-		ASGameMode* GM = Cast<ASGameMode>(GetWorld()->GetAuthGameMode());
-		if (GM)
+		UE_LOG(LogTemp, Log, TEXT("Character has a shield, going into shield damage calculation"))
+		float ShieldDamage = Damage;
+		if (Damage < Shield)
 		{
-			GM->OnActorKilled.Broadcast(DamagedActor, DamageCauser);
+			Shield -= Damage;
+			Damage = 0.f;
 		}
-		bIsDead = true;
+		else
+		{
+			ShieldDamage = Shield;
+			Damage = Damage - Shield;
+			Shield = 0.0f;
+			
+		}
+		OnShieldChanged.Broadcast(this, Shield, ShieldDamage, DamageType, InstigatedBy, DamageCauser);
+		UE_LOG(LogTemp, Log, TEXT("%s Damage Taken, new Shield is %s"), *FString::SanitizeFloat(Damage), *FString::SanitizeFloat(Health));
 	}
+	if (Damage > 0.0f)
+	{
+		Health = FMath::Clamp(Health - Damage, 0.0f, MaxHealth);
+
+		UE_LOG(LogTemp, Log, TEXT("%s Damage Taken, new Health is %s"), *FString::SanitizeFloat(Damage), *FString::SanitizeFloat(Health));
+
+		OnHealthChanged.Broadcast(this, Health, Damage, DamageType, InstigatedBy, DamageCauser);
+		if (Health <= 0.0f && !bIsDead)
+		{
+			ASGameMode* GM = Cast<ASGameMode>(GetWorld()->GetAuthGameMode());
+			if (GM)
+			{
+				GM->OnActorKilled.Broadcast(DamagedActor, DamageCauser);
+			}
+			bIsDead = true;
+		}
+	}
+		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_StartShieldRegen);
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle_StartShieldRegen, this, &USHealthComponent::StartShieldRegen, ShieldRegenDelay, false);
 }
+
+
 
 void USHealthComponent::Heal(float HealAmount)
 {
@@ -128,5 +174,26 @@ void USHealthComponent::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& 
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(USHealthComponent, Health);
+	DOREPLIFETIME(USHealthComponent, Shield);
+}
 
+void USHealthComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	if (GetOwnerRole() == ROLE_Authority)
+	{
+		if (bShieldRegen)
+		{
+			float ShieldRegenAmount = ShieldSecondRegen * DeltaTime;
+			UE_LOG(LogTemp, Log, TEXT("Shield Regenerating by %f"), ShieldRegenAmount);
+			Shield = FMath::Clamp(Shield + ShieldRegenAmount, 0.0f, MaxShield);
+			OnShieldChanged.Broadcast(this, Shield, 0.0f, nullptr, nullptr, nullptr);
+			if (Shield == MaxShield)
+			{
+				bShieldRegen = false;
+			}
+		}
+	
+		
+	}
 }

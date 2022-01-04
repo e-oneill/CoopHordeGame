@@ -8,7 +8,8 @@
 
 //OnHealth Changed Event
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_SixParams(FOnHealthChangedSignature, USHealthComponent*, HealthComp, float, Health, float, HealthDelta, const class UDamageType*, DamageType, class AController*, InstigatedBy, AActor*, DamageCauser);
-
+//OnShield Changed Event
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_SixParams(FOnShieldChangedSignature, USHealthComponent*, HealthComp, float, Shield, float, ShieldDelta, const class UDamageType*, DamageType, class AController*, InstigatedBy, AActor*, DamageCauser);
 UCLASS( ClassGroup=(COOP), meta=(BlueprintSpawnableComponent) )
 class COOPHORDEGAME_API USHealthComponent : public UActorComponent
 {
@@ -33,14 +34,45 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
 	float MaxHealth;
 
+	UPROPERTY(BlueprintReadWrite, Category = "Stats", ReplicatedUsing = OnRep_Shield)
+		float Shield;
+
+	//Seconds to wait before starting shield regen. Damage will reset this timer;
+	UPROPERTY(EditAnywhere, Category = "Stats")
+	float ShieldRegenDelay;
+
+	//Seconds it takes for Shield to fully recharge
+	UPROPERTY(EditAnywhere, Category = "Stats")
+	float ShieldRegenDuration;
+
+	FTimerHandle TimerHandle_StartShieldRegen;
+
+	void StartShieldRegen();
+	//Bool that drives whether shield should regenerate
+	bool bShieldRegen;
+	//Float used to track shield regen in C++
+	float ShieldSecondRegen;
+
+	UFUNCTION()
+		void OnRep_Shield(float OldHealth);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+		float MaxShield;
+
 	UFUNCTION()
 	void handleTakeDamage(AActor* DamagedActor, float Damage, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
 
 	bool bIsDead;
 public:	
 	// Called every frame
+	void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 		FOnHealthChangedSignature OnHealthChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+		FOnShieldChangedSignature OnShieldChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "Health Component")
 	void Heal(float HealAmount);

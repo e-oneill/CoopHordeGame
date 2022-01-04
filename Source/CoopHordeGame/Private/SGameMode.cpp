@@ -79,9 +79,9 @@ void ASGameMode::CheckWaveState()
 
 	if (!bIsBotAlive && !bIsPreparingWave)
 	{
-		
 		SetWaveState(EWaveState::WaveComplete);
-		PrepareForNextWave();
+		FTimerHandle TimerHandle_WaitBeforeStartingNextWave;
+		GetWorldTimerManager().SetTimer(TimerHandle_WaitBeforeStartingNextWave, this, &ASGameMode::PrepareForNextWave, 2.0f, false);
 	}
 }
 
@@ -170,6 +170,11 @@ int32 ASGameMode::GetWaveCount() const
 float ASGameMode::GetFriendlyFirePercentage()
 {
 	return FriendlyFirePercentage;
+}
+
+float ASGameMode::GetTimeBetweenWaves() const
+{
+	return TimeBetweenWaves;
 }
 
 void ASGameMode::SpawnBotTimerElapsed()

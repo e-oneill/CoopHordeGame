@@ -64,7 +64,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loadout")
 		class ULoadoutComponent* Loadout;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Loadout")
+	UPROPERTY(BlueprintReadOnly, Category = "Loadout", Replicated)
 		class USLoadoutItemObjectWeapon* EquipppedWeapon;
 
 	//UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loadout")
